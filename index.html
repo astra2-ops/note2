@@ -47,14 +47,14 @@
 
   <!-- Scripts -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
     const camera = document.getElementById('camera');
     const captureButton = document.getElementById('capture');
     const saveButton = document.getElementById('save');
     const images = [];
-    let currentCanvas = null;
-    let currentCtx = null;
-    let pdfDoc = null; // To store the PDF instance
+    const { jsPDF } = window.jspdf; // Import jsPDF
+    let pdfDoc = null;
 
     // Initialize the camera
     navigator.mediaDevices.getUserMedia({ video: true })
@@ -117,21 +117,22 @@
         return;
       }
 
-      // Create a new PDF document if it doesn't exist
+      // Initialize PDF if not already initialized
       if (!pdfDoc) {
         pdfDoc = new jsPDF();
       }
 
-      // Add each captured image to the PDF
       images.forEach((image, index) => {
         const imgData = image.toDataURL('image/jpeg');
+
+        // Add the image to the PDF (use "addImage" with specific positioning)
         if (index > 0) {
-          pdfDoc.addPage(); // Add a new page for each image
+          pdfDoc.addPage(); // Add a new page for each new image
         }
-        pdfDoc.addImage(imgData, 'JPEG', 10, 10, 180, 160); // Add image with specific margins
+        pdfDoc.addImage(imgData, 'JPEG', 10, 10, 180, 160); // Adjust the margins and size of the image
       });
 
-      // Save the PDF to device
+      // Save the PDF
       pdfDoc.save('combined_photos.pdf');
     });
   </script>
