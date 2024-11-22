@@ -12,10 +12,6 @@
       align-items: center;
       padding: 20px;
     }
-    #canvas {
-      border: 1px solid #000;
-      margin-bottom: 20px;
-    }
     #camera {
       display: block;
       margin: 20px 0;
@@ -23,38 +19,74 @@
     .canvas-container {
       position: relative;
       display: inline-block;
+      margin: 20px;
     }
     .canvas-container canvas {
       display: block;
+      max-width: 320px;
+      max-height: 240px;
     }
     #capture {
       margin: 10px;
     }
+    #next {
+      margin-top: 10px;
+    }
     #save {
       margin-top: 20px;
+    }
+    .thumbnail {
+      width: 60px;
+      height: 45px;
+      margin: 10px;
+      position: relative;
+      display: inline-block;
+    }
+    .thumbnails-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .delete-btn {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background-color: red;
+      color: white;
+      border: none;
+      padding: 5px;
+      cursor: pointer;
+      font-size: 12px;
+      border-radius: 50%;
     }
   </style>
 </head>
 <body>
   <h1>Capture, Draw, and Save Photos to Same PDF</h1>
-  
-  <!-- Capture Photo -->
+
+  <!-- Camera to capture photo -->
   <video id="camera" width="320" height="240" autoplay></video>
   <button id="capture">Capture Photo</button>
 
-  <!-- Save All Images as PDF -->
+  <!-- Next and Save buttons -->
+  <button id="next" style="display: none;">Next</button>
   <button id="save">Save All to PDF</button>
 
-  <!-- Scripts -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.js"></script>
+  <!-- Thumbnails grid -->
+  <div class="thumbnails-grid" id="thumbnails"></div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script>
     const camera = document.getElementById('camera');
     const captureButton = document.getElementById('capture');
+    const nextButton = document.getElementById('next');
     const saveButton = document.getElementById('save');
-    const images = [];
+    const thumbnailsGrid = document.getElementById('thumbnails');
     const { jsPDF } = window.jspdf; // Import jsPDF
+    let images = [];
     let pdfDoc = null;
+    let currentCanvas = null;
+    let currentCtx = null;
 
     // Initialize the camera
     navigator.mediaDevices.getUserMedia({ video: true })
@@ -74,14 +106,16 @@
       newCanvas.height = videoHeight;
       newCtx.drawImage(camera, 0, 0, videoWidth, videoHeight);
 
-      // Create a div to hold the canvas and drawing
+      // Create canvas container for editing
       const canvasContainer = document.createElement('div');
       canvasContainer.classList.add('canvas-container');
       canvasContainer.appendChild(newCanvas);
+      document.body.appendChild(canvasContainer); // Preview the canvas
 
-      document.body.appendChild(canvasContainer); // For previewing
+      currentCanvas = newCanvas;
+      currentCtx = newCtx;
 
-      // Enable drawing on the new canvas
+      // Enable drawing on the canvas
       let drawing = false;
       let lastX = 0, lastY = 0;
 
@@ -106,9 +140,55 @@
       newCanvas.addEventListener('mouseup', () => drawing = false);
       newCanvas.addEventListener('mouseout', () => drawing = false);
 
-      // Store the canvas for later PDF saving
-      images.push(newCanvas);
+      // Show the next button
+      nextButton.style.display = 'block';
     });
+
+    // Move to next image and add it to grid
+    nextButton.addEventListener('click', () => {
+      // Create a thumbnail of the current image
+      const thumbnailCanvas = document.createElement('canvas');
+      const thumbnailCtx = thumbnailCanvas.getContext('2d');
+      thumbnailCanvas.width = 60;
+      thumbnailCanvas.height = 45;
+      thumbnailCtx.drawImage(currentCanvas, 0, 0, 60, 45);
+
+      const thumbnailDiv = document.createElement('div');
+      thumbnailDiv.classList.add('thumbnail');
+      thumbnailDiv.appendChild(thumbnailCanvas);
+
+      // Add a delete button to the thumbnail
+      const deleteBtn = document.createElement('button');
+      deleteBtn.classList.add('delete-btn');
+      deleteBtn.textContent = 'X';
+      thumbnailDiv.appendChild(deleteBtn);
+      deleteBtn.addEventListener('click', () => deleteThumbnail(thumbnailDiv, currentCanvas));
+
+      thumbnailsGrid.appendChild(thumbnailDiv);
+
+      // Store the current canvas image for PDF later
+      images.push(currentCanvas);
+
+      // Reset for next image
+      currentCanvas = null;
+      currentCtx = null;
+
+      // Hide the current image editing and show the next photo capture
+      nextButton.style.display = 'none';
+      document.querySelector('.canvas-container').remove();
+    });
+
+    // Delete image from grid and PDF array
+    function deleteThumbnail(thumbnailDiv, canvas) {
+      // Remove the thumbnail from the grid
+      thumbnailsGrid.removeChild(thumbnailDiv);
+
+      // Remove the image from the images array (for PDF generation)
+      const index = images.indexOf(canvas);
+      if (index !== -1) {
+        images.splice(index, 1);
+      }
+    }
 
     // Save All Images to PDF
     saveButton.addEventListener('click', () => {
