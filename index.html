@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Multiple Photos Editor WebApp</title>
+  <title>Capture, Edit and Save to PDF</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -36,17 +36,14 @@
   </style>
 </head>
 <body>
-  <h1>Capture, Draw, and Save Multiple Photos</h1>
+  <h1>Capture, Draw, and Save Photos to Same PDF</h1>
   
   <!-- Capture Photo -->
   <video id="camera" width="320" height="240" autoplay></video>
   <button id="capture">Capture Photo</button>
 
-  <!-- List of Captured Images -->
-  <div id="image-container"></div>
-
   <!-- Save All Images as PDF -->
-  <button id="save">Save All as PDF</button>
+  <button id="save">Save All to PDF</button>
 
   <!-- Scripts -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.js"></script>
@@ -54,10 +51,10 @@
     const camera = document.getElementById('camera');
     const captureButton = document.getElementById('capture');
     const saveButton = document.getElementById('save');
-    const imageContainer = document.getElementById('image-container');
     const images = [];
     let currentCanvas = null;
     let currentCtx = null;
+    let pdfDoc = null; // To store the PDF instance
 
     // Initialize the camera
     navigator.mediaDevices.getUserMedia({ video: true })
@@ -82,7 +79,7 @@
       canvasContainer.classList.add('canvas-container');
       canvasContainer.appendChild(newCanvas);
 
-      imageContainer.appendChild(canvasContainer);
+      document.body.appendChild(canvasContainer); // For previewing
 
       // Enable drawing on the new canvas
       let drawing = false;
@@ -113,24 +110,29 @@
       images.push(newCanvas);
     });
 
-    // Save All Images as PDF
+    // Save All Images to PDF
     saveButton.addEventListener('click', () => {
-      const element = document.createElement('div');
-      
-      images.forEach(image => {
-        const imageClone = image.cloneNode(true); // Clone the canvas to avoid direct modifications
-        element.appendChild(imageClone);
+      if (!images.length) {
+        alert('No images to save!');
+        return;
+      }
+
+      // Create a new PDF document if it doesn't exist
+      if (!pdfDoc) {
+        pdfDoc = new jsPDF();
+      }
+
+      // Add each captured image to the PDF
+      images.forEach((image, index) => {
+        const imgData = image.toDataURL('image/jpeg');
+        if (index > 0) {
+          pdfDoc.addPage(); // Add a new page for each image
+        }
+        pdfDoc.addImage(imgData, 'JPEG', 10, 10, 180, 160); // Add image with specific margins
       });
 
-      const opt = {
-        margin:       1,
-        filename:     'combined_photos.pdf',
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 4 },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-
-      html2pdf().from(element).set(opt).save();
+      // Save the PDF to device
+      pdfDoc.save('combined_photos.pdf');
     });
   </script>
 </body>
