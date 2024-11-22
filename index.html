@@ -100,12 +100,10 @@
 
   <h1>Capture, Draw, and Save Photos to PDF</h1>
 
-  <!-- Camera and control buttons -->
   <video id="camera" width="320" height="240" autoplay></video>
   <button id="capture">Capture Photo</button>
   <button id="switch-camera">Switch Camera</button>
 
-  <!-- Controls for pen size, color, and delete annotations -->
   <div class="controls">
     <label for="pen-size">Pen Size: </label>
     <input type="range" id="pen-size" min="1" max="10" value="5">
@@ -114,11 +112,9 @@
     <button id="clear-annotations">Clear Annotations</button>
   </div>
 
-  <!-- Next and Save buttons -->
   <button id="next" style="display: none;">Next</button>
   <button id="save">Save All to PDF</button>
 
-  <!-- Thumbnails grid -->
   <div class="thumbnails-grid" id="thumbnails"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -132,11 +128,12 @@
     const thumbnailsGrid = document.getElementById('thumbnails');
     const penSizeInput = document.getElementById('pen-size');
     const penColorInput = document.getElementById('pen-color');
-    const { jsPDF } = window.jspdf; // Import jsPDF
+    const { jsPDF } = window.jspdf;
     let images = [];
     let pdfDoc = null;
     let currentCanvas = null;
     let currentCtx = null;
+    let baseImage = null;  // Store the base image separately
     let penSize = 5;
     let penColor = '#000000';
     let drawing = false;
@@ -144,10 +141,9 @@
     let currentStream = null;
     let currentDeviceId = null;
 
-    // Function to initialize camera stream
     function initializeCamera(deviceId) {
       if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop()); // Stop previous stream
+        currentStream.getTracks().forEach(track => track.stop());
       }
 
       const constraints = {
@@ -166,19 +162,17 @@
         .catch(err => console.error('Camera Error: ', err));
     }
 
-    // Access all available video devices
     let videoDevices = [];
 
     navigator.mediaDevices.enumerateDevices()
       .then(devices => {
         videoDevices = devices.filter(device => device.kind === 'videoinput');
         if (videoDevices.length > 0) {
-          initializeCamera(videoDevices[1].deviceId); // Start with back camera by default
+          initializeCamera(videoDevices[1].deviceId);
         }
       })
       .catch(err => console.error('Error listing devices: ', err));
 
-    // Switch between front and back cameras
     switchCameraButton.addEventListener('click', () => {
       const nextDeviceId = videoDevices.find(device => device.deviceId !== currentDeviceId);
       if (nextDeviceId) {
@@ -186,7 +180,6 @@
       }
     });
 
-    // Capture the photo
     captureButton.addEventListener('click', () => {
       const videoWidth = camera.videoWidth;
       const videoHeight = camera.videoHeight;
@@ -197,53 +190,23 @@
       newCanvas.height = videoHeight;
       newCtx.drawImage(camera, 0, 0, videoWidth, videoHeight);
 
-      // Create canvas container for editing
+      baseImage = newCanvas;  // Store the base image
+      currentCanvas = document.createElement('canvas');
+      currentCanvas.width = videoWidth;
+      currentCanvas.height = videoHeight;
+      currentCtx = currentCanvas.getContext('2d');
+      currentCtx.drawImage(baseImage, 0, 0, videoWidth, videoHeight); // Draw base image onto the new canvas
+
       const canvasContainer = document.createElement('div');
       canvasContainer.classList.add('canvas-container');
-      canvasContainer.appendChild(newCanvas);
-      document.body.appendChild(canvasContainer); // Preview the canvas
+      canvasContainer.appendChild(currentCanvas);
+      document.body.appendChild(canvasContainer);
 
-      currentCanvas = newCanvas;
-      currentCtx = newCtx;
-
-      // Enable drawing on the canvas
-      newCanvas.addEventListener('mousedown', (e) => {
-        drawing = true;
-        const rect = currentCanvas.getBoundingClientRect();
-        lastX = e.clientX - rect.left;
-        lastY = e.clientY - rect.top;
-      });
-
-      newCanvas.addEventListener('mousemove', (e) => {
-        if (!drawing) return;
-        const rect = currentCanvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        currentCtx.strokeStyle = penColor;
-        currentCtx.lineWidth = penSize;
-        currentCtx.beginPath();
-        currentCtx.moveTo(lastX, lastY);
-        currentCtx.lineTo(x, y);
-        currentCtx.stroke();
-
-        lastX = x;
-        lastY = y;
-      });
-
-      newCanvas.addEventListener('mouseup', () => drawing = false);
-      newCanvas.addEventListener('mouseout', () => drawing = false);
-
-      // Disable the capture button to prevent further captures until next is clicked
       captureButton.disabled = true;
-
-      // Show the next button
       nextButton.style.display = 'block';
     });
 
-    // Move to next image and add it to grid
     nextButton.addEventListener('click', () => {
-      // Create a thumbnail of the current image
       const thumbnailCanvas = document.createElement('canvas');
       const thumbnailCtx = thumbnailCanvas.getContext('2d');
       thumbnailCanvas.width = 60;
@@ -254,7 +217,6 @@
       thumbnailDiv.classList.add('thumbnail');
       thumbnailDiv.appendChild(thumbnailCanvas);
 
-      // Add a delete button to the thumbnail
       const deleteBtn = document.createElement('button');
       deleteBtn.classList.add('delete-btn');
       deleteBtn.textContent = 'X';
@@ -265,18 +227,15 @@
       });
 
       thumbnailsGrid.appendChild(thumbnailDiv);
-      images.push(currentCanvas); // Save the image for the PDF
+      images.push(currentCanvas);
 
-      // Reset the canvas for the next photo
       currentCanvas = null;
       currentCtx = null;
 
-      // Enable the capture button again and hide the next button
       captureButton.disabled = false;
       nextButton.style.display = 'none';
     });
 
-    // Save images as PDF
     saveButton.addEventListener('click', () => {
       if (images.length === 0) {
         alert('No images to save.');
@@ -293,11 +252,38 @@
       pdfDoc.save('photos.pdf');
     });
 
-    // Clear annotations on the current image
     clearAnnotationsButton.addEventListener('click', () => {
       if (currentCtx) {
         currentCtx.clearRect(0, 0, currentCanvas.width, currentCanvas.height);
+        currentCtx.drawImage(baseImage, 0, 0, currentCanvas.width, currentCanvas.height);  // Re-draw the base image
       }
+    });
+
+    camera.addEventListener('click', (e) => {
+      if (drawing) {
+        currentCtx.lineTo(e.offsetX, e.offsetY);
+        currentCtx.stroke();
+      }
+    });
+
+    camera.addEventListener('mousedown', (e) => {
+      drawing = true;
+      currentCtx.beginPath();
+      currentCtx.moveTo(e.offsetX, e.offsetY);
+    });
+
+    camera.addEventListener('mouseup', () => {
+      drawing = false;
+    });
+
+    penSizeInput.addEventListener('input', (e) => {
+      penSize = e.target.value;
+      currentCtx.lineWidth = penSize;
+    });
+
+    penColorInput.addEventListener('input', (e) => {
+      penColor = e.target.value;
+      currentCtx.strokeStyle = penColor;
     });
   </script>
 </body>
