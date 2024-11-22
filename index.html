@@ -59,6 +59,12 @@
       font-size: 12px;
       border-radius: 50%;
     }
+    .controls {
+      margin: 20px 0;
+    }
+    .controls label {
+      margin-right: 10px;
+    }
   </style>
 </head>
 <body>
@@ -67,6 +73,15 @@
   <!-- Camera to capture photo -->
   <video id="camera" width="320" height="240" autoplay></video>
   <button id="capture">Capture Photo</button>
+
+  <!-- Controls for pen size, color, and delete annotations -->
+  <div class="controls">
+    <label for="pen-size">Pen Size: </label>
+    <input type="range" id="pen-size" min="1" max="10" value="5">
+    <label for="pen-color">Pen Color: </label>
+    <input type="color" id="pen-color" value="#000000">
+    <button id="clear-annotations">Clear Annotations</button>
+  </div>
 
   <!-- Next and Save buttons -->
   <button id="next" style="display: none;">Next</button>
@@ -81,12 +96,19 @@
     const captureButton = document.getElementById('capture');
     const nextButton = document.getElementById('next');
     const saveButton = document.getElementById('save');
+    const clearAnnotationsButton = document.getElementById('clear-annotations');
     const thumbnailsGrid = document.getElementById('thumbnails');
+    const penSizeInput = document.getElementById('pen-size');
+    const penColorInput = document.getElementById('pen-color');
     const { jsPDF } = window.jspdf; // Import jsPDF
     let images = [];
     let pdfDoc = null;
     let currentCanvas = null;
     let currentCtx = null;
+    let penSize = 5;
+    let penColor = '#000000';
+    let drawing = false;
+    let lastX = 0, lastY = 0;
 
     // Initialize the camera
     navigator.mediaDevices.getUserMedia({ video: true })
@@ -116,9 +138,6 @@
       currentCtx = newCtx;
 
       // Enable drawing on the canvas
-      let drawing = false;
-      let lastX = 0, lastY = 0;
-
       newCanvas.addEventListener('mousedown', (e) => {
         drawing = true;
         lastX = e.offsetX;
@@ -129,10 +148,12 @@
         if (!drawing) return;
         const x = e.offsetX;
         const y = e.offsetY;
-        newCtx.beginPath();
-        newCtx.moveTo(lastX, lastY);
-        newCtx.lineTo(x, y);
-        newCtx.stroke();
+        currentCtx.strokeStyle = penColor;
+        currentCtx.lineWidth = penSize;
+        currentCtx.beginPath();
+        currentCtx.moveTo(lastX, lastY);
+        currentCtx.lineTo(x, y);
+        currentCtx.stroke();
         lastX = x;
         lastY = y;
       });
@@ -214,6 +235,22 @@
 
       // Save the PDF
       pdfDoc.save('combined_photos.pdf');
+    });
+
+    // Update pen size and color
+    penSizeInput.addEventListener('input', (e) => {
+      penSize = e.target.value;
+    });
+
+    penColorInput.addEventListener('input', (e) => {
+      penColor = e.target.value;
+    });
+
+    // Clear annotations on the current canvas
+    clearAnnotationsButton.addEventListener('click', () => {
+      if (currentCtx) {
+        currentCtx.clearRect(0, 0, currentCanvas.width, currentCanvas.height); // Clear the canvas
+      }
     });
   </script>
 </body>
